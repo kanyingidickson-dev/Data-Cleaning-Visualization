@@ -1,5 +1,7 @@
 # Data Cleaning & Visualization
 
+![CI](https://github.com/kanyingidickson-dev/Data-Cleaning-Visualization/actions/workflows/ci.yml/badge.svg)
+
 A small data project that turns a deliberately messy, real-world-style CSV into a cleaned dataset and a set of insights.
 
 The focus is:
