@@ -36,6 +36,12 @@ a {
   padding: 24px;
 }
 
+@media (max-width: 720px) {
+  .appShell {
+    padding: 14px;
+  }
+}
+
 .container {
   max-width: 1180px;
   margin: 0 auto;
@@ -51,6 +57,13 @@ a {
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(10px);
   border-radius: 14px;
+}
+
+@media (max-width: 720px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 .title {
@@ -84,6 +97,14 @@ a {
   padding: 14px;
 }
 
+.errorBox {
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  background: rgba(220, 38, 38, 0.04);
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: #7f1d1d;
+}
+
 .cardTitle {
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -101,6 +122,10 @@ a {
   flex: 1;
 }
 
+.grow {
+  flex: 1;
+}
+
 .btn {
   appearance: none;
   border: 1px solid rgba(15, 23, 42, 0.18);
@@ -110,6 +135,31 @@ a {
   padding: 10px 12px;
   font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    transform 90ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.08);
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.btn:hover:not(:disabled) {
+  background: #111c33;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:focus-visible {
+  outline: 3px solid rgba(79, 70, 229, 0.35);
+  outline-offset: 2px;
 }
 
 .btn:disabled {
@@ -122,12 +172,47 @@ a {
   color: #0f172a;
 }
 
+.btnSecondary:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.03);
+}
+
 .input {
   border: 1px solid rgba(15, 23, 42, 0.18);
   background: white;
   border-radius: 10px;
   padding: 10px 12px;
-  min-width: 280px;
+  min-width: 0;
+}
+
+.input:focus-visible {
+  outline: 3px solid rgba(79, 70, 229, 0.35);
+  outline-offset: 2px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+@media (min-width: 980px) {
+  .formGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .muted {
@@ -139,6 +224,23 @@ a {
   border-collapse: collapse;
   width: 100%;
   font-size: 13px;
+  min-width: max-content;
+}
+
+.tableWrap {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 12px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.98);
+}
+
+.emptyState {
+  border: 1px dashed rgba(15, 23, 42, 0.2);
+  background: rgba(15, 23, 42, 0.02);
+  border-radius: 12px;
+  padding: 14px;
+  color: #475569;
+  font-size: 13px;
 }
 
 .table th,
@@ -147,6 +249,7 @@ a {
   padding: 10px 10px;
   text-align: left;
   vertical-align: top;
+  white-space: nowrap;
 }
 
 .table th {
@@ -154,6 +257,44 @@ a {
   top: 0;
   background: rgba(255, 255, 255, 0.98);
   z-index: 1;
+}
+
+.loadingOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(6px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.loadingCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 2px solid rgba(15, 23, 42, 0.2);
+  border-top-color: rgba(79, 70, 229, 0.9);
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .pill {

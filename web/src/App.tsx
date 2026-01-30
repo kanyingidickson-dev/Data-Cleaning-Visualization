@@ -24,6 +24,7 @@ type MetricsState = {
 
 export default function App() {
   const [busy, setBusy] = useState(false);
+  const [busyLabel, setBusyLabel] = useState<string>("Working...");
   const [error, setError] = useState<string | null>(null);
   const [sql, setSql] = useState<string>("SELECT * FROM cleaned LIMIT 50;");
   const [sqlResult, setSqlResult] = useState<Array<Record<string, unknown>>>([]);
@@ -55,10 +56,12 @@ export default function App() {
   );
 
   const canClean = preview.rawRows.length > 0;
+  const hasRaw = preview.rawRows.length > 0;
 
   async function loadSample(): Promise<void> {
     setError(null);
     setBusy(true);
+    setBusyLabel("Loading sample dataset...");
     try {
       await resetAllState();
       const res = await fetch("./sample_messy_dataset.csv");
@@ -79,6 +82,7 @@ export default function App() {
     if (!file) return;
     setError(null);
     setBusy(true);
+    setBusyLabel("Loading CSV...");
     try {
       await resetAllState();
       const db = await getDuckDB();
@@ -96,6 +100,7 @@ export default function App() {
     if (!trimmed) return;
     setError(null);
     setBusy(true);
+    setBusyLabel("Downloading CSV...");
     try {
       await resetAllState();
       const res = await fetch(trimmed);
@@ -114,6 +119,7 @@ export default function App() {
   async function runCleaning(): Promise<void> {
     setError(null);
     setBusy(true);
+    setBusyLabel("Cleaning dataset...");
     try {
       const conn = await getConnection();
       await conn.query(createCleanedTableSql(params));
@@ -132,6 +138,7 @@ export default function App() {
   async function runSql(): Promise<void> {
     setError(null);
     setBusy(true);
+    setBusyLabel("Running SQL...");
     try {
       const conn = await getConnection();
       const result = await conn.query(sql);
@@ -146,6 +153,7 @@ export default function App() {
   async function exportCleanedCsv(): Promise<void> {
     setError(null);
     setBusy(true);
+    setBusyLabel("Exporting CSV...");
     try {
       const conn = await getConnection();
       await conn.query(
@@ -213,33 +221,57 @@ export default function App() {
         values: deptRows.map((r) => asNumber(r.avg_salary) ?? 0),
       });
 
+      const buckets = 12;
       const hist = await conn.query(
         `WITH stats AS (
           SELECT min(salary_usd) AS minv, max(salary_usd) AS maxv FROM cleaned
-        ), b AS (
-          SELECT width_bucket(salary_usd, stats.minv, stats.maxv, 12) AS b, count(*) AS n
-          FROM cleaned, stats
+        ), params AS (
+          SELECT
+            minv,
+            maxv,
+            CASE WHEN maxv > minv THEN (maxv - minv) / ${buckets} ELSE 1 END AS step
+          FROM stats
+        ), bounds AS (
+          SELECT
+            i AS b,
+            minv + i * step AS startv,
+            minv + (i + 1) * step AS endv,
+            minv,
+            maxv,
+            step
+          FROM params, range(${buckets}) t(i)
+        ), counts AS (
+          SELECT
+            CASE
+              WHEN salary_usd IS NULL THEN NULL
+              WHEN (SELECT maxv FROM params) = (SELECT minv FROM params) THEN 0
+              ELSE least(
+                ${buckets - 1},
+                greatest(0, CAST(floor((salary_usd - (SELECT minv FROM params)) / (SELECT step FROM params)) AS BIGINT))
+              )
+            END AS b,
+            count(*) AS n
+          FROM cleaned
           GROUP BY b
         )
-        SELECT b, n, (SELECT minv FROM stats) AS minv, (SELECT maxv FROM stats) AS maxv
-        FROM b
-        ORDER BY b`,
+        SELECT
+          bounds.b,
+          bounds.startv,
+          bounds.endv,
+          coalesce(counts.n, 0) AS n
+        FROM bounds
+        LEFT JOIN counts ON counts.b = bounds.b
+        ORDER BY bounds.b`,
       );
 
       const histRows = arrowTableToJsonRows(hist);
       if (histRows.length > 0) {
-        const minv = asNumber(histRows[0]?.minv) ?? 0;
-        const maxv = asNumber(histRows[0]?.maxv) ?? minv;
-        const buckets = 12;
-        const step = buckets > 0 ? (maxv - minv) / buckets : 1;
-
         const labels: string[] = [];
         const values: number[] = [];
         for (const r of histRows) {
-          const b = asNumber(r.b) ?? 0;
-          const start = minv + (b - 1) * step;
-          const end = minv + b * step;
-          labels.push(`${Math.round(start).toLocaleString()}–${Math.round(end).toLocaleString()}`);
+          const startv = asNumber(r.startv) ?? 0;
+          const endv = asNumber(r.endv) ?? startv;
+          labels.push(`${Math.round(startv).toLocaleString()}–${Math.round(endv).toLocaleString()}`);
           values.push(asNumber(r.n) ?? 0);
         }
         setSalaryHist({ labels, values });
@@ -264,6 +296,17 @@ export default function App() {
 
   return (
     <div className="appShell">
+      {busy ? (
+        <div className="loadingOverlay" role="status" aria-live="polite">
+          <div className="loadingCard">
+            <div className="spinner" />
+            <div>
+              <div style={{ fontWeight: 700 }}>{busyLabel}</div>
+              <div className="muted">This can take a moment on large datasets.</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="container">
         <div className="header">
           <div className="title">
@@ -285,7 +328,7 @@ export default function App() {
               <button className="btn" disabled={busy} onClick={loadSample}>
                 Load sample dataset
               </button>
-              <label className="btn btnSecondary" style={{ display: "inline-flex", gap: 10 }}>
+              <label className="btn btnSecondary">
                 Upload CSV
                 <input
                   type="file"
@@ -311,7 +354,7 @@ export default function App() {
             </div>
 
             {error ? (
-              <pre className="card" style={{ whiteSpace: "pre-wrap", marginTop: 12 }}>
+              <pre className="errorBox" style={{ whiteSpace: "pre-wrap", marginTop: 12 }}>
                 {error}
               </pre>
             ) : null}
@@ -321,44 +364,47 @@ export default function App() {
             <div>
               <div className="card">
                 <div className="cardTitle">2) Cleaning rules (matches Python pipeline)</div>
-                <div className="row">
-                  <label className="muted">Age min</label>
-                  <input
-                    className="input"
-                    style={{ minWidth: 120 }}
-                    value={ageMin}
-                    onChange={(e) => setAgeMin(Number(e.target.value))}
-                    type="number"
-                    disabled={busy}
-                  />
-                  <label className="muted">Age max</label>
-                  <input
-                    className="input"
-                    style={{ minWidth: 120 }}
-                    value={ageMax}
-                    onChange={(e) => setAgeMax(Number(e.target.value))}
-                    type="number"
-                    disabled={busy}
-                  />
-                  <label className="muted">Exp min</label>
-                  <input
-                    className="input"
-                    style={{ minWidth: 120 }}
-                    value={expMin}
-                    onChange={(e) => setExpMin(Number(e.target.value))}
-                    type="number"
-                    disabled={busy}
-                  />
-                  <label className="muted">Exp max</label>
-                  <input
-                    className="input"
-                    style={{ minWidth: 120 }}
-                    value={expMax}
-                    onChange={(e) => setExpMax(Number(e.target.value))}
-                    type="number"
-                    disabled={busy}
-                  />
-                  <div className="spacer" />
+                <div className="formGrid">
+                  <div className="field">
+                    <label className="muted">Age min</label>
+                    <input
+                      className="input"
+                      value={ageMin}
+                      onChange={(e) => setAgeMin(Number(e.target.value))}
+                      type="number"
+                      disabled={busy}
+                    />
+                  </div>
+                  <div className="field">
+                    <label className="muted">Age max</label>
+                    <input
+                      className="input"
+                      value={ageMax}
+                      onChange={(e) => setAgeMax(Number(e.target.value))}
+                      type="number"
+                      disabled={busy}
+                    />
+                  </div>
+                  <div className="field">
+                    <label className="muted">Exp min</label>
+                    <input
+                      className="input"
+                      value={expMin}
+                      onChange={(e) => setExpMin(Number(e.target.value))}
+                      type="number"
+                      disabled={busy}
+                    />
+                  </div>
+                  <div className="field">
+                    <label className="muted">Exp max</label>
+                    <input
+                      className="input"
+                      value={expMax}
+                      onChange={(e) => setExpMax(Number(e.target.value))}
+                      type="number"
+                      disabled={busy}
+                    />
+                  </div>
                   <button className="btn" disabled={busy || !canClean} onClick={() => void runCleaning()}>
                     Clean dataset
                   </button>
@@ -405,7 +451,7 @@ export default function App() {
                   disabled={busy}
                 />
                 <div className="row" style={{ marginTop: 10 }}>
-                  <button className="btn" disabled={busy || !canClean} onClick={() => void runSql()}>
+                  <button className="btn" disabled={busy || !hasRaw} onClick={() => void runSql()}>
                     Run SQL
                   </button>
                   <div className="spacer" />
@@ -452,10 +498,13 @@ function UrlLoader({
   return (
     <div className="row" style={{ marginTop: 12 }}>
       <input
-        className="input"
+        className="input grow"
         placeholder="Paste a CSV URL (must allow CORS)…"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onLoad(url);
+        }}
         disabled={disabled}
       />
       <button className="btn btnSecondary" disabled={disabled || !url.trim()} onClick={() => onLoad(url)}>
