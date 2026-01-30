@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.quality import validate_cleaned, validate_raw
+
 RAW_PATH = Path("data/raw/messy_dataset.csv")
 CLEANED_PATH = Path("data/cleaned/cleaned_dataset.csv")
 
@@ -54,28 +56,37 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     out["years_experience"] = pd.to_numeric(out["years_experience"], errors="coerce")
 
     out = out[(out["age"].notna()) & (out["age"] >= 16) & (out["age"] <= 80)]
-    out = out[(out["years_experience"].notna()) & (out["years_experience"] >= 0) & (out["years_experience"] <= 60)]
+    out = out[
+        (out["years_experience"].notna())
+        & (out["years_experience"] >= 0)
+        & (out["years_experience"] <= 60)
+    ]
 
-    out["remote"] = out["remote"].astype(str).str.strip().str.lower().map({"yes": True, "no": False})
+    remote_map = {
+        "yes": True,
+        "y": True,
+        "true": True,
+        "1": True,
+        "no": False,
+        "n": False,
+        "false": False,
+        "0": False,
+    }
+    out["remote"] = (
+        out["remote"].astype("string").str.strip().str.lower().map(remote_map).astype("boolean")
+    )
 
     out["hired_date"] = pd.to_datetime(out["hired_date"], errors="coerce")
 
-    dept_median = out.groupby("department")["salary_usd"].median()
+    dept_median = out.groupby("department")["salary_usd"].transform("median")
     global_median = out["salary_usd"].median()
-
-    def _impute(row):
-        if pd.notna(row["salary_usd"]):
-            return row["salary_usd"]
-        d = row["department"]
-        m = dept_median.get(d)
-        if pd.notna(m):
-            return float(m)
-        return float(global_median) if pd.notna(global_median) else None
-
-    out["salary_usd"] = out.apply(_impute, axis=1)
+    out["salary_usd"] = out["salary_usd"].fillna(dept_median).fillna(global_median)
 
     out = out.drop(columns=["salary"])
-    out = out.sort_values(["department", "salary_usd"], ascending=[True, False])
+    out = out.sort_values(
+        ["department", "salary_usd", "employee_id"],
+        ascending=[True, False, True],
+    )
 
     return out
 
@@ -87,7 +98,9 @@ def save_cleaned(df: pd.DataFrame) -> None:
 
 def main() -> int:
     df = load_raw()
+    validate_raw(df)
     cleaned = clean(df)
+    validate_cleaned(cleaned)
     save_cleaned(cleaned)
     print(f"Wrote cleaned dataset to: {CLEANED_PATH}")
     return 0

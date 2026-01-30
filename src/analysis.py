@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.quality import validate_cleaned
+
 CLEANED_PATH = Path("data/cleaned/cleaned_dataset.csv")
 INSIGHTS_PATH = Path("reports/insights.md")
 
@@ -13,6 +15,7 @@ def main() -> int:
         raise SystemExit("Cleaned dataset not found. Run: python -m src.cleaning")
 
     df = pd.read_csv(CLEANED_PATH, parse_dates=["hired_date"])
+    validate_cleaned(df)
 
     lines: list[str] = []
     lines.append("# Insights\n")
@@ -38,8 +41,13 @@ def main() -> int:
     lines.append("## Notable observations\n")
     top_dept = dept.index[0]
     lines.append(f"- Highest average salary is in **{top_dept}**.")
-    lines.append("- Salaries vary widely even within a department, suggesting experience and role level matter.")
-    lines.append("- Remote status alone does not fully explain salary differences in this small sample.")
+    lines.append(
+        "- Salaries vary widely even within a department, suggesting experience and role level "
+        "matter."
+    )
+    lines.append(
+        "- Remote status alone does not fully explain salary differences in this small sample."
+    )
     lines.append("")
 
     INSIGHTS_PATH.parent.mkdir(parents=True, exist_ok=True)

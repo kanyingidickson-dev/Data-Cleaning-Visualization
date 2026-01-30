@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+from src.quality import validate_cleaned
+
 CLEANED_PATH = Path("data/cleaned/cleaned_dataset.csv")
 FIG_DIR = Path("reports/figures")
 
@@ -15,6 +17,7 @@ def main() -> int:
         raise SystemExit("Cleaned dataset not found. Run: python -m src.cleaning")
 
     df = pd.read_csv(CLEANED_PATH, parse_dates=["hired_date"])
+    validate_cleaned(df)
 
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     sns.set_theme(style="whitegrid")
