@@ -8,3 +8,7 @@ venv/
 data/cleaned/
 reports/insights.md
 reports/figures/*.png
+
+web/node_modules/
+web/dist/
+web/.env*
