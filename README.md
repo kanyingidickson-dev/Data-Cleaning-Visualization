@@ -14,6 +14,8 @@ The focus is:
 - Python
 - pandas
 - matplotlib / seaborn
+- React + TypeScript (Vite)
+- DuckDB-WASM (in-browser analytics)
 
 ## Folder structure
 
@@ -24,11 +26,28 @@ The focus is:
 
 ## How to run locally
 
+### Python pipeline
+
 ```bash
 pip install -r requirements.txt
 python -m src.cleaning
 python -m src.analysis
 python -m src.visualization
+```
+
+### Web app (GitHub Pages-ready)
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Build:
+
+```bash
+cd web
+npm run build
 ```
 
 Outputs:
@@ -51,8 +70,11 @@ A small sample HR-style dataset with common issues:
 - Invalid ages (e.g. `< 16` or `> 80`) are removed.
 - Department names are normalized to a canonical set.
 
-## Future improvements
+## Web app features
 
-- Add data quality tests (schema checks)
-- Add richer feature engineering and hypothesis testing
-- Replace the small sample dataset with a larger public dataset
+- Load data from a sample dataset, local CSV upload, or a CSV URL (CORS required)
+- Clean the dataset in-browser (mirrors the Python rules)
+- Preview raw and cleaned data
+- Interactive charts
+- SQL explorer
+- Export cleaned CSV
